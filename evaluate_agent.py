@@ -3,24 +3,16 @@ import matplotlib.pyplot as plt
 import random
 from env.mtd_env import MTDEnv
 from stable_baselines3 import PPO
-
-# ===============================
 # Parameters
-# ===============================
+
 STEPS = 50
-EPISODES = 3     # 🔥 FIXED (was 1)
+EPISODES = 3
 EPSILON = 0.1
 
 ATTACK_THRESHOLD = 0.7
-
-# ===============================
 # Create Environment
-# ===============================
 env = MTDEnv()
-
-# ===============================
 # Baseline Evaluation
-# ===============================
 baseline_syn = []
 baseline_attack = 0
 
@@ -46,14 +38,13 @@ for ep in range(EPISODES):
 
 print("Baseline Mean SYN Rate:", np.mean(baseline_syn))
 
-# ===============================
+
 # Load PPO Model
-# ===============================
+
 model = PPO.load("results/ppo_mtd_improved.zip")
 
-# ===============================
 # PPO Evaluation
-# ===============================
+
 ppo_syn = []
 ppo_actions = []
 ppo_rewards = []
@@ -96,9 +87,8 @@ for ep in range(EPISODES):
 
 print("PPO Mean SYN Rate:", np.mean(ppo_syn))
 
-# ===============================
+
 # SYN Rate Comparison Plot
-# ===============================
 plt.figure(figsize=(10,5))
 
 plt.plot(baseline_syn, label="Baseline")
@@ -112,9 +102,7 @@ plt.legend()
 plt.savefig("results/syn_rate_comparison_27.png")
 plt.show()
 
-# ===============================
 # Attack Reduction Metrics
-# ===============================
 baseline_mean = np.mean(baseline_syn)
 ppo_mean = np.mean(ppo_syn)
 
@@ -129,9 +117,8 @@ print("PPO Attack Level:", ppo_mean)
 print("Attack Reduction (%):", attack_reduction)
 print("Mitigation (%):", mitigation)
 
-# ===============================
 # Attack Mitigation Plot
-# ===============================
+
 plt.figure()
 
 plt.bar(["Attack Mitigation"], [mitigation])
@@ -146,9 +133,8 @@ plt.text(0, mitigation + 1, f"{mitigation:.1f}%", ha="center")
 plt.savefig("results/attack_mitigation_27.png")
 plt.show()
 
-# ===============================
+
 # MTD Action Distribution
-# ===============================
 plt.figure()
 
 actions = [0,1,2,3]
@@ -165,17 +151,14 @@ plt.xticks(actions)
 plt.savefig("results/mtd_action_distribution_27.png")
 plt.show()
 
-# ===============================
 # Reward Smoothing Function
-# ===============================
 def moving_avg(data, window=10):
     if len(data) < window:
         return data
     return np.convolve(data, np.ones(window)/window, mode='valid')
 
-# ===============================
-# PPO Reward Curve (Smoothed)
-# ===============================
+
+# PPO Reward Curve
 plt.figure()
 
 smoothed_rewards = moving_avg(ppo_rewards)
@@ -191,9 +174,8 @@ plt.legend()
 plt.savefig("results/ppo_reward_curve_27.png")
 plt.show()
 
-# ===============================
-# Step-wise Reward Plot (Extra)
-# ===============================
+
+# Step-wise Reward Plot 
 plt.figure()
 
 plt.plot(ppo_step_rewards)
