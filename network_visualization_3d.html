@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MTD Network Simulator</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+
+<style>
+
+body{
+margin:0;
+overflow:hidden;
+background:white;
+font-family:Arial;
+color:black;
+}
+
+/* Control Panel */
+
+#panel{
+position:absolute;
+top:10px;
+left:10px;
+background:#f0f4f8;
+padding:12px;
+border-radius:8px;
+border:1px solid #ccc;
+}
+
+/* Packet Log */
+
+#log{
+position:absolute;
+bottom:10px;
+left:10px;
+width:350px;
+height:150px;
+overflow:auto;
+background:#f7f7f7;
+padding:10px;
+border-radius:8px;
+border:1px solid #ccc;
+font-size:13px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="panel">
+<b>MTD Network Simulator</b><br><br>
+
+🟢 Server<br>
+🔵 Client<br>
+🔴 Attacker<br>
+🟡 Switch<br><br>
+
+Server IP: <span id="ip">10.0.0.2</span><br>
+Port: <span id="port">80</span><br>
+MTD Action: <span id="action">None</span>
+
+</div>
+
+<div id="log"></div>
+
+<script>
+
+/* Scene Setup */
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const camera = new THREE.PerspectiveCamera(
+70,
+window.innerWidth/window.innerHeight,
+0.1,
+1000
+);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+camera.position.set(0,4,8);
+
+
+/* Light */
+
+const light = new THREE.PointLight(0xffffff,1);
+light.position.set(10,10,10);
+scene.add(light);
+
+
+/* Node Creation */
+
+function createNode(x,y,z,color,name){
+
+const geo = new THREE.SphereGeometry(0.35,32,32);
+const mat = new THREE.MeshPhongMaterial({color:color});
+const node = new THREE.Mesh(geo,mat);
+
+node.position.set(x,y,z);
+scene.add(node);
+
+/* Label */
+
+const div = document.createElement('div');
+div.style.position='absolute';
+div.style.color='black';
+div.style.fontSize='14px';
+div.style.fontWeight='bold';
+div.style.textShadow="none";
+div.innerHTML=name;
+
+document.body.appendChild(div);
+
+node.userData.label = div;
+
+return node;
+
+}
+
+
+/* Nodes */
+
+const server   = createNode(0,2,0,0x00ff00,"Server");
+const switchN  = createNode(0,0,0,0xffff00,"Switch");
+const client   = createNode(-3,-2,0,0x0066ff,"Client");
+const attacker = createNode(3,-2,0,0xff0000,"Attacker");
+
+
+/* Links */
+
+function createLink(a,b){
+
+const pts = [];
+pts.push(a.position);
+pts.push(b.position);
+
+const geo = new THREE.BufferGeometry().setFromPoints(pts);
+const mat = new THREE.LineBasicMaterial({color:0x555555});
+
+const line = new THREE.Line(geo,mat);
+scene.add(line);
+
+}
+
+createLink(server,switchN);
+createLink(client,switchN);
+createLink(attacker,switchN);
+
+
+/* Packet Animation */
+
+function sendPacket(src,dst,color,type="circle"){
+
+let packet;
+
+if(type==="square"){
+
+const geo = new THREE.PlaneGeometry(0.15,0.15);
+const mat = new THREE.MeshBasicMaterial({
+color:color,
+side:THREE.DoubleSide
+});
+
+packet = new THREE.Mesh(geo,mat);
+
+}
+
+else{
+
+const geo = new THREE.SphereGeometry(0.1,12,12);
+const mat = new THREE.MeshBasicMaterial({color:color});
+
+packet = new THREE.Mesh(geo,mat);
+
+}
+
+scene.add(packet);
+
+let t = 0;
+
+function move(){
+
+t += 0.02;
+
+packet.position.lerpVectors(src.position,dst.position,t);
+packet.lookAt(camera.position);
+
+if(t < 1)
+requestAnimationFrame(move);
+else
+scene.remove(packet);
+
+}
+
+move();
+
+}
+
+
+/* Log */
+
+function log(msg){
+
+const box = document.getElementById("log");
+
+box.innerHTML += msg + "<br>";
+box.scrollTop = box.scrollHeight;
+
+}
+
+
+/* Legitimate Traffic */
+
+setInterval(()=>{
+
+sendPacket(server,switchN,0x00ff00,"square");
+sendPacket(switchN,client,0x00ff00,"square");
+
+log("Server → Client HTTP packet");
+
+},2000);
+
+
+/* SYN Attack */
+
+setInterval(()=>{
+
+sendPacket(attacker,switchN,0xff0000,"square");
+sendPacket(switchN,server,0xff0000,"square");
+
+log("Attacker → SYN packet");
+
+},600);
+
+
+/* MTD */
+
+let ip="10.0.0.2";
+let port="80";
+
+function update(){
+
+document.getElementById("ip").innerText=ip;
+document.getElementById("port").innerText=port;
+
+}
+
+
+/* IP Hopping */
+
+function ipHop(){
+
+ip="10.0.0."+Math.floor(Math.random()*200+20);
+
+server.material.color.set(0x00ffff);
+
+document.getElementById("action").innerText="IP Hopping";
+
+log("MTD: IP changed → "+ip);
+
+setTimeout(()=>{
+server.material.color.set(0x00ff00)
+},1000);
+
+update();
+
+}
+
+
+/* Port Hopping */
+
+function portHop(){
+
+port=Math.floor(Math.random()*8000+1000);
+
+server.material.color.set(0xff00ff);
+
+document.getElementById("action").innerText="Port Hopping";
+
+log("MTD: Port changed → "+port);
+
+setTimeout(()=>{
+server.material.color.set(0x00ff00)
+},1000);
+
+update();
+
+}
+
+
+/* Both */
+
+function bothHop(){
+
+ip="10.0.0."+Math.floor(Math.random()*200+20);
+port=Math.floor(Math.random()*8000+1000);
+
+server.material.color.set(0xffff00);
+
+document.getElementById("action").innerText="IP + Port Hopping";
+
+log("MTD: IP "+ip+" Port "+port);
+
+setTimeout(()=>{
+server.material.color.set(0x00ff00)
+},1000);
+
+update();
+
+}
+
+
+/* RL Simulation */
+
+setInterval(()=>{
+
+let a = Math.floor(Math.random()*4);
+
+if(a==1) ipHop();
+else if(a==2) portHop();
+else if(a==3) bothHop();
+else document.getElementById("action").innerText="No Action";
+
+},8000);
+
+
+/* Label Position */
+
+function updateLabels(){
+
+const nodes=[server,client,attacker,switchN];
+
+nodes.forEach(n=>{
+
+const vector = n.position.clone();
+vector.project(camera);
+
+const x = (vector.x*0.5+0.5)*window.innerWidth;
+const y = (-vector.y*0.5+0.5)*window.innerHeight;
+
+n.userData.label.style.left=x+"px";
+n.userData.label.style.top=y+"px";
+
+});
+
+}
+
+
+/* Render Loop */
+
+function animate(){
+
+requestAnimationFrame(animate);
+
+controls.update();
+renderer.render(scene,camera);
+
+updateLabels();
+
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
